@@ -1,9 +1,5 @@
 ################################################################################
 
-# Example : performs YOLO (v3) object detection from a video file
-# specified on the command line (e.g. python FILE.py video_file) or from an
-# attached web camera
-
 # Author : Toby Breckon, toby.breckon@durham.ac.uk
 
 # Copyright (c) 2019 Toby Breckon, Durham University, UK
@@ -12,17 +8,6 @@
 # Implements the You Only Look Once (YOLO) object detection architecture decribed in full in:
 # Redmon, J., & Farhadi, A. (2018). Yolov3: An incremental improvement. arXiv preprint arXiv:1804.02767.
 # https://pjreddie.com/media/files/papers/YOLOv3.pdf
-
-# This code: significant portions based in part on the tutorial and example available at:
-# https://www.learnopencv.com/deep-learning-based-object-detection-using-yolov3-with-opencv-python-c/
-# https://github.com/spmallick/learnopencv/blob/master/ObjectDetection-YOLO/object_detection_yolo.py
-# under LICENSE: https://github.com/spmallick/learnopencv/blob/master/ObjectDetection-YOLO/LICENSE
-
-# To use first download the following files:
-
-# https://pjreddie.com/media/files/yolov3.weights
-# https://github.com/pjreddie/darknet/blob/master/cfg/yolov3.cfg?raw=true
-# https://github.com/pjreddie/darknet/blob/master/data/coco.names?raw=true
 
 ################################################################################
 
@@ -33,6 +18,10 @@ import math
 import numpy as np
 
 ################################################################################
+
+currentPath = ("D://howel//OneDrive - Durham University//Degree//Year 3//SSA//"
+               "Computer Vision//Coursework//Computer-Vision//")
+videoPath = "D://howel//Videos//Computer Vision Coursework"
 
 keep_processing = True
 
