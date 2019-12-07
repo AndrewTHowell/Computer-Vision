@@ -34,7 +34,11 @@ imageNameListL = sorted(os.listdir(fullPathLeftImages))
 
 # Section End
 
+<<<<<<< HEAD
 # Section: Create stereoProcessor object
+=======
+# Section: Create stereoProcessor Object
+>>>>>>> c3da3cffedc7200ec046e20390585913b863d504
 
 # setup the disparity stereo processor to find a maximum of 128 disparity values
 # (adjust parameters if needed - this will effect speed to processing)
@@ -46,7 +50,11 @@ stereoProcessor = cv2.StereoSGBM_create(0, maxDisparity, 21)
 
 # Section End
 
+<<<<<<< HEAD
 # Region: User input variables
+=======
+# Region: User Input Variables
+>>>>>>> c3da3cffedc7200ec046e20390585913b863d504
 
 cropDisparity = False  # display full or cropped disparity image
 pausePlayback = False  # pause until key press after each image
