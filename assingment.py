@@ -35,6 +35,12 @@ fullPathRightImages = os.path.join(master_path_to_dataset, rightImagesPath)
 # get a list of the left image files and sort them (by timestamp in filename)
 imageNameListL = sorted(os.listdir(fullPathLeftImages))
 
+currentDirectoryPath = os.path.dirname(os.path.abspath(__file__))
+
+class_file = os.path.join(currentDirectoryPath, "coco.names")
+config_file = os.path.join(currentDirectoryPath, "yolov3.cfg")
+weights_file = os.path.join(currentDirectoryPath, "yolov3.weights")
+
 # Section End
 
 # Section: Yolo functions
@@ -57,12 +63,12 @@ def drawPred(image, class_name, confidence, left, top, right, bottom, colour):
     # construct label
     label = '%s:%.2f' % (class_name, confidence)
 
-    #Display the label at the top of the bounding box
+    # Display the label at the top of the bounding box
     labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
     top = max(top, labelSize[1])
     cv2.rectangle(image, (left, top - round(1.5*labelSize[1])),
-        (left + round(1.5*labelSize[0]), top + baseLine), (255, 255, 255), cv2.FILLED)
-    cv2.putText(image, label, (left, top), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0,0,0), 1)
+                  (left + round(1.5*labelSize[0]), top + baseLine), (255, 255, 255), cv2.FILLED)
+    cv2.putText(image, label, (left, top), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 1)
 
 
 # Remove the bounding boxes with low confidence using non-maxima suppression
@@ -122,6 +128,7 @@ def getOutputsNames(net):
     # Get the names of the output layers, i.e. the layers with unconnected outputs
     return [layersNames[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 
+
 # Section End
 
 # Section: Create stereoProcessor object
@@ -133,6 +140,39 @@ def getOutputsNames(net):
 # disp12MaxDiff[, preFilterCap[, uniquenessRatio[, speckleWindowSize[, speckleRange[, mode]]]]]]]]) -> retval
 maxDisparity = 128
 stereoProcessor = cv2.StereoSGBM_create(0, maxDisparity, 21)
+
+# Section End
+
+# Section: Create yolo object
+
+# YOLO CNN object detection model
+confThreshold = 0.5  # Confidence threshold
+nmsThreshold = 0.4   # Non-maximum suppression threshold
+inpWidth = 416       # Width of network's input image
+inpHeight = 416      # Height of network's input image
+
+# Load names of classes from file
+classesFile = class_file
+classes = None
+with open(classesFile, 'rt') as f:
+    classes = f.read().rstrip('\n').split('\n')
+
+# load configuration and weight files for the model and load the network using them
+net = cv2.dnn.readNetFromDarknet(config_file, weights_file)
+output_layer_names = getOutputsNames(net)
+
+# defaults DNN_BACKEND_INFERENCE_ENGINE if Intel Inference Engine lib available or DNN_BACKEND_OPENCV otherwise
+net.setPreferableBackend(cv2.dnn.DNN_BACKEND_DEFAULT)
+
+# change to cv2.dnn.DNN_TARGET_CPU (slower) if this causes issues (should fail gracefully if OpenCL not available)
+net.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL)
+
+
+# define display window name + trackbar
+windowName = 'YOLOv3 object detection: ' + weights_file
+cv2.namedWindow(windowName, cv2.WINDOW_NORMAL)
+trackbarName = 'reporting confidence > (x 0.01)'
+cv2.createTrackbar(trackbarName, windowName, 0, 100, on_trackbar)
 
 # Section End
 
@@ -174,9 +214,9 @@ for imageNameL in imageNameListL:
 
         # Read left and right images and display in windows
         imgL = cv2.imread(fullPathLeftImage, cv2.IMREAD_COLOR)
-        cv2.imshow('left image', imgL)
+        cv2.imshow('Left image', imgL)
         imgR = cv2.imread(fullPathRightImage, cv2.IMREAD_COLOR)
-        cv2.imshow('right image', imgR)
+        cv2.imshow('Right image', imgR)
 
         # Region End
 
@@ -206,7 +246,8 @@ for imageNameL in imageNameListL:
         # Region: Prep for/Display Disparity Image
 
         # Scale the disparity to 8-bit for viewing
-        _, disparity = cv2.threshold(disparity, 0, maxDisparity * 16, cv2.THRESH_TOZERO)
+        _, disparity = cv2.threshold(disparity, 0, maxDisparity * 16,
+                                     cv2.THRESH_TOZERO)
         disparityScaled = (disparity / 16.).astype(np.uint8)
 
         # If cropping wanted:
@@ -218,14 +259,64 @@ for imageNameL in imageNameListL:
 
         # display image (scaling it to the full 0->255 range based on the number
         # of disparities in use for the stereo part)
-        cv2.imshow("disparity", (disparityScaled * (256. / maxDisparity)).astype(np.uint8))
+        cv2.imshow("disparity",
+                   (disparityScaled * (256. / maxDisparity)).astype(np.uint8))
 
         # Region End
 
-        nearestObjectDistance = -1
+        # Region: YOLO
+
+        # start a timer (to see how long processing and display takes)
+        start_t = cv2.getTickCount()
+
+        # create a 4D tensor (OpenCV 'blob') from imgL (pixels scaled 0->1, image resized)
+        tensor = cv2.dnn.blobFromImage(imgL, 1/255, (inpWidth, inpHeight),
+                                       [0, 0, 0], 1, crop=False)
+
+        # set the input to the CNN network
+        net.setInput(tensor)
+
+        # runs forward inference to get output of the final output layers
+        results = net.forward(output_layer_names)
+
+        # remove the bounding boxes with low confidence
+        confThreshold = cv2.getTrackbarPos(trackbarName, windowName) / 100
+        classIDs, confidences, boxes = postprocess(imgL, results,
+                                                   confThreshold, nmsThreshold)
+
+        # draw resulting detections on image
+        for detected_object in range(0, len(boxes)):
+            box = boxes[detected_object]
+            left = box[0]
+            top = box[1]
+            width = box[2]
+            height = box[3]
+            drawPred(imgL,
+                     classes[classIDs[detected_object]],
+                     confidences[detected_object],
+                     left, top, left + width, top + height,
+                     (255, 178, 50))
+
+        # Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
+        t, _ = net.getPerfProfile()
+        label = 'Inference time: %.2f ms' % (t * 1000.0 / cv2.getTickFrequency())
+        cv2.putText(imgL, label,
+                    (0, 15),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5, (0, 0, 255))
+
+        # display image
+        cv2.imshow(windowName, imgL)
+
+        # stop the timer and convert to ms. (to see how long processing and display takes)
+        stop_t = ((cv2.getTickCount() - start_t)/cv2.getTickFrequency()) * 1000
+
+        # Region End
+
+        nearestObjectDistance = -1.0
 
         # Output filenames and nearest detected scene object
-        print("{0}.png\n{1}.png : nearest detected scene object ({2:.1}m)"
+        print("{0}.png\n{1}.png : nearest detected scene object ({2:.1f}m)"
               .format(imageNameL, imageNameR, nearestObjectDistance))
 
         # exit - x
@@ -236,7 +327,8 @@ for imageNameL in imageNameListL:
 
         desiredFPS = 25
         keyDelay = 1000 / desiredFPS  # e.g: 1000ms / 25 fps = 40 ms)
-        key = cv2.waitKey(40 * (not(pausePlayback))) & 0xFF
+        key = cv2.waitKey(max(2, keyDelay - int(math.ceil(stop_t))) * (not(pausePlayback))) & 0xFF
+
         # keyboard input for exit (as standard), save disparity and cropping
         if (key == ord('x')):       # exit
             break  # exit
