@@ -32,6 +32,12 @@ SEACHINGFOR = {"person": (114, 20, 34),
                "bus": (255, 35, 1),
                "truck": (248, 243, 53)}
 
+# YOLO CNN object detection model
+CONFIDENCETHRESHOLD = 0.5  # Confidence threshold
+NMSTHRESHOLD = 0.4   # Non-maximum suppression threshold
+INPWIDTH = 416       # WIDTH OF NETWORK'S INPUT IMAGE
+INPHEIGHT = 416      # Height of network's input image
+
 # Section End
 
 # Section: File handling
@@ -67,9 +73,9 @@ def on_trackbar(val):
 # class_name: string name of detected object_detection
 # left, top, right, bottom: rectangle parameters for detection
 # colour: to draw detection rectangle in
-def drawPred(image, class_name, confidence, left, top, right, bottom, colour):
+def drawPred(image, class_name, distance, left, top, right, bottom, colour):
     # Draw a bounding box.
-    cv2.rectangle(image, (left, distance), (right, bottom), colour, 3)
+    cv2.rectangle(image, (left, top), (right, bottom), colour, 3)
 
     # construct label
     label = "{0}: {1:.2f}m".format(class_name, distance)
@@ -156,12 +162,6 @@ stereoProcessor = cv2.StereoSGBM_create(0, maxDisparity, 21)
 
 # Section: Create yolo object
 
-# YOLO CNN object detection model
-confThreshold = 0.5  # Confidence threshold
-nmsThreshold = 0.4   # Non-maximum suppression threshold
-inpWidth = 416       # Width of network's input image
-inpHeight = 416      # Height of network's input image
-
 # Load names of classes from file
 classesFile = class_file
 classes = None
@@ -177,13 +177,6 @@ net.setPreferableBackend(cv2.dnn.DNN_BACKEND_DEFAULT)
 
 # change to cv2.dnn.DNN_TARGET_CPU (slower) if this causes issues (should fail gracefully if OpenCL not available)
 net.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL)
-
-
-# define display window name + trackbar
-windowName = 'YOLOv3 object detection: ' + weights_file
-cv2.namedWindow(windowName, cv2.WINDOW_NORMAL)
-trackbarName = 'reporting confidence > (x 0.01)'
-cv2.createTrackbar(trackbarName, windowName, 0, 100, on_trackbar)
 
 # Section End
 
@@ -270,18 +263,34 @@ for imageNameL in imageNameListL:
 
         # display image (scaling it to the full 0->255 range based on the number
         # of disparities in use for the stereo part)
-        cv2.imshow("disparity",
-                   (disparityScaled * (256. / maxDisparity)).astype(np.uint8))
+        scaledUpDisparity = (disparityScaled * (256. / maxDisparity)).astype(np.uint8)
+        cv2.imshow("Disparity", scaledUpDisparity)
 
         # Region End
 
         # Region: YOLO
 
+        windowName = "YOLO"
+        cv2.namedWindow(windowName, cv2.WINDOW_NORMAL)
+
+        yoloImgL = imgL
+        # If cropping wanted:
+        if (cropDisparity):
+            # Crop left part of disparity image where not seen by both cameras
+            width = yoloImgL.shape[1]
+            height = yoloImgL.shape[0]
+            # Crop out the car bonnet
+            yoloImgL = yoloImgL[0:390, 135:width]
+        width = yoloImgL.shape[1]
+        height = yoloImgL.shape[0]
+
+        print("yoloImgL.shape: {0}".format(yoloImgL.shape))
+
         # start a timer (to see how long processing and display takes)
         start_t = cv2.getTickCount()
 
         # create a 4D tensor (OpenCV 'blob') from imgL (pixels scaled 0->1, image resized)
-        tensor = cv2.dnn.blobFromImage(imgL, 1/255, (inpWidth, inpHeight),
+        tensor = cv2.dnn.blobFromImage(yoloImgL, 1/255, (width, height),
                                        [0, 0, 0], 1, crop=False)
 
         # set the input to the CNN network
@@ -291,9 +300,8 @@ for imageNameL in imageNameListL:
         results = net.forward(output_layer_names)
 
         # remove the bounding boxes with low confidence
-        confThreshold = cv2.getTrackbarPos(trackbarName, windowName) / 100
-        classIDs, confidences, boxes = postprocess(imgL, results,
-                                                   confThreshold, nmsThreshold)
+        classIDs, confidences, boxes = postprocess(yoloImgL, results,
+                                                   CONFIDENCETHRESHOLD, NMSTHRESHOLD)
 
         # Region: Draw rects on image
 
@@ -308,14 +316,16 @@ for imageNameL in imageNameListL:
                 height = box[3]
 
                 # Get distance of object
-
                 # Get centre of object
                 objectCentre = [left + (width//2), top - (height//2)]
-                print("disparityScaled[objectCentre]: {0}".format(disparityScaled * (256. / maxDisparity)[objectCentre]))
+                print("objectCentre: {0}".format(objectCentre))
+                #print("disparityScaled[objectCentre]: {0}".format(scaledUpDisparity[objectCentre]))
 
-                drawPred(imgL,
+                objectDistance = 0.1
+
+                drawPred(yoloImgL,
                          objectName,
-                         0, # objectDistance,
+                         objectDistance,
                          left, top, left + width, top + height,
                          SEACHINGFOR[objectName])
 
@@ -324,13 +334,14 @@ for imageNameL in imageNameListL:
         # Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
         t, _ = net.getPerfProfile()
         label = 'Inference time: %.2f ms' % (t * 1000.0 / cv2.getTickFrequency())
-        cv2.putText(imgL, label,
+        cv2.putText(yoloImgL, label,
                     (0, 15),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (0, 0, 255))
 
         # display image
-        cv2.imshow(windowName, imgL)
+        cv2.imshow(windowName, yoloImgL)
+        cv2.resizeWindow(windowName, yoloImgL.shape[1], yoloImgL.shape[0])
 
         # stop the timer and convert to ms. (to see how long processing and display takes)
         stop_t = ((cv2.getTickCount() - start_t)/cv2.getTickFrequency()) * 1000
