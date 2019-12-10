@@ -291,6 +291,9 @@ for imageNameL in imageNameListL:
             top = box[1]
             width = box[2]
             height = box[3]
+            print("classes: {0}".format(classes))
+            print("classIDs[detected_object]: {0}".format(classIDs[detected_object]))
+            print("classes[classIDs[detected_object]]: {0}".format(classes[classIDs[detected_object]]))
             drawPred(imgL,
                      classes[classIDs[detected_object]],
                      confidences[detected_object],
