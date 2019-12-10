@@ -38,6 +38,13 @@ NMSTHRESHOLD = 0.4   # Non-maximum suppression threshold
 INPWIDTH = 416       # WIDTH OF NETWORK'S INPUT IMAGE
 INPHEIGHT = 416      # Height of network's input image
 
+camera_focal_length_px = 399.9745178222656  # focal length in pixels
+camera_focal_length_m = 4.8 / 1000          # focal length in metres (4.8 mm)
+stereo_camera_baseline_m = 0.2090607502     # camera baseline in metres
+
+image_centre_h = 262.0
+image_centre_w = 474.5
+
 # Section End
 
 # Section: File handling
@@ -191,6 +198,51 @@ startTimestamp = ""  # set to timestamp to skip forward to
 
 # Region End
 
+# Section: 2D disparity to 3D
+
+
+def project_disparity_to_3d(disparity, max_disparity, rgb=[]):
+
+    points = []
+
+    f = camera_focal_length_px
+    B = stereo_camera_baseline_m
+
+    height, width = disparity.shape[:2]
+
+    # assume a minimal disparity of 2 pixels is possible to get Zmax
+    # and then we get reasonable scaling in X and Y output if we change
+    # Z to Zmax in the lines X = ....; Y = ...; below
+
+    # Zmax = ((f * B) / 2);
+
+    for y in range(height):  # 0 - height is the y axis index
+        for x in range(width):  # 0 - width is the x axis index
+
+            # if we have a valid non-zero disparity
+
+            if (disparity[y, x] > 0):
+
+                # calculate corresponding 3D point [X, Y, Z]
+
+                # stereo lecture - slide 22 + 25
+
+                Z = (f * B) / disparity[y, x]
+
+                X = ((x - image_centre_w) * Z) / f
+                Y = ((y - image_centre_h) * Z) / f
+
+                # add to points
+                if len(rgb) > 0:
+                    points.append([X, Y, Z, rgb[y, x, 2], rgb[y, x, 1], rgb[y, x, 0]])
+                else:
+                    points.append([X, Y, Z])
+
+    return points
+
+
+# Section End
+
 # Section: Iteration through image files
 
 for imageNameL in imageNameListL:
@@ -247,7 +299,7 @@ for imageNameL in imageNameListL:
 
         # Region End
 
-        # Region: Prep for/Display Disparity Image
+        # Region: Prep for/Display Disparity Images
 
         # Scale the disparity to 8-bit for viewing
         _, disparity = cv2.threshold(disparity, 0, maxDisparity * 16,
@@ -266,6 +318,12 @@ for imageNameL in imageNameListL:
         scaledUpDisparity = (disparityScaled * (256. / maxDisparity)).astype(np.uint8)
         cv2.imshow("Disparity", scaledUpDisparity)
 
+        # Now 3D
+        points3D = project_disparity_to_3d(disparityScaled, maxDisparity)
+
+        for i in range(10):
+            print("points3D[i]: {0}".format(points3D[i]))
+
         # Region End
 
         # Region: YOLO
@@ -274,15 +332,9 @@ for imageNameL in imageNameListL:
         cv2.namedWindow(windowName, cv2.WINDOW_NORMAL)
 
         yoloImgL = imgL
-        # If cropping wanted:
-        if (cropDisparity):
-            # Crop left part of disparity image where not seen by both cameras
-            width = yoloImgL.shape[1]
-            height = yoloImgL.shape[0]
-            # Crop out the car bonnet
-            yoloImgL = yoloImgL[0:390, 135:width]
-        width = yoloImgL.shape[1]
-        height = yoloImgL.shape[0]
+
+        yoloWidth = yoloImgL.shape[1]
+        yoloHeight = yoloImgL.shape[0]
 
         print("yoloImgL.shape: {0}".format(yoloImgL.shape))
 
@@ -290,7 +342,7 @@ for imageNameL in imageNameListL:
         start_t = cv2.getTickCount()
 
         # create a 4D tensor (OpenCV 'blob') from imgL (pixels scaled 0->1, image resized)
-        tensor = cv2.dnn.blobFromImage(yoloImgL, 1/255, (width, height),
+        tensor = cv2.dnn.blobFromImage(yoloImgL, 1/255, (yoloWidth, yoloHeight),
                                        [0, 0, 0], 1, crop=False)
 
         # set the input to the CNN network
@@ -317,10 +369,19 @@ for imageNameL in imageNameListL:
 
                 # Get distance of object
                 # Get centre of object
-                objectCentre = [left + (width//2), top - (height//2)]
+                if (cropDisparity):
+                    objectCentre = [top - (height//2), left + (width//2)]
+                else:
+                    objectCentre = [top - (height//2), left + (width//2)]
                 print("objectCentre: {0}".format(objectCentre))
-                #print("disparityScaled[objectCentre]: {0}".format(scaledUpDisparity[objectCentre]))
 
+                """
+                centreDisparity = scaledUpDisparity[objectCentre]
+                print("centreDisparity: {0}".format(centreDisparity))
+
+                objectDistance = (FOCALLENGTH
+                                  * (BASELINEDISTANCE/centreDisparity))
+                """
                 objectDistance = 0.1
 
                 drawPred(yoloImgL,
@@ -330,6 +391,13 @@ for imageNameL in imageNameListL:
                          SEACHINGFOR[objectName])
 
         # Region End
+
+        # If cropping wanted:
+        if (cropDisparity):
+            # Crop left part of disparity image where not seen by both cameras
+            # Crop out the car bonnet
+            yoloImgL = yoloImgL[0:390, 135:yoloWidth]
+            print("yoloImgL.shape: {0}".format(yoloImgL.shape))
 
         # Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
         t, _ = net.getPerfProfile()
