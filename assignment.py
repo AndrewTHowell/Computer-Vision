@@ -23,6 +23,17 @@ master_path_to_dataset = "D:/howel/Videos/Computer Vision Coursework"
 
 # Section End
 
+# Section: Constants
+
+SEACHINGFOR = {"person": (114, 20, 34),
+               "bicycle": (44, 85, 69),
+               "car": (32, 33, 79),
+               "motorbike": (52, 59, 41),
+               "bus": (255, 35, 1),
+               "truck": (248, 243, 53)}
+
+# Section End
+
 # Section: File handling
 
 leftImagesPath = "left-images"     # edit this if needed
@@ -58,10 +69,10 @@ def on_trackbar(val):
 # colour: to draw detection rectangle in
 def drawPred(image, class_name, confidence, left, top, right, bottom, colour):
     # Draw a bounding box.
-    cv2.rectangle(image, (left, top), (right, bottom), colour, 3)
+    cv2.rectangle(image, (left, distance), (right, bottom), colour, 3)
 
     # construct label
-    label = '%s:%.2f' % (class_name, confidence)
+    label = "{0}: {1:.2f}m".format(class_name, distance)
 
     # Display the label at the top of the bounding box
     labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
@@ -284,21 +295,31 @@ for imageNameL in imageNameListL:
         classIDs, confidences, boxes = postprocess(imgL, results,
                                                    confThreshold, nmsThreshold)
 
+        # Region: Draw rects on image
+
         # draw resulting detections on image
         for detected_object in range(0, len(boxes)):
-            box = boxes[detected_object]
-            left = box[0]
-            top = box[1]
-            width = box[2]
-            height = box[3]
-            print("classes: {0}".format(classes))
-            print("classIDs[detected_object]: {0}".format(classIDs[detected_object]))
-            print("classes[classIDs[detected_object]]: {0}".format(classes[classIDs[detected_object]]))
-            drawPred(imgL,
-                     classes[classIDs[detected_object]],
-                     confidences[detected_object],
-                     left, top, left + width, top + height,
-                     (255, 178, 50))
+            objectName = classes[classIDs[detected_object]]
+            if objectName in SEACHINGFOR:
+                box = boxes[detected_object]
+                left = box[0]
+                top = box[1]
+                width = box[2]
+                height = box[3]
+
+                # Get distance of object
+
+                # Get centre of object
+                objectCentre = [left + (width//2), top - (height//2)]
+                print("disparityScaled[objectCentre]: {0}".format(disparityScaled * (256. / maxDisparity)[objectCentre]))
+
+                drawPred(imgL,
+                         objectName,
+                         0, # objectDistance,
+                         left, top, left + width, top + height,
+                         SEACHINGFOR[objectName])
+
+        # Region End
 
         # Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
         t, _ = net.getPerfProfile()
