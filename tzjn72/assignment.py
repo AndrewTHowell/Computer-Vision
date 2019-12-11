@@ -459,6 +459,16 @@ for imageNameL in imageNameListL:
             # Crop out the car bonnet
             yoloImgL = yoloImgL[0:390, 135:yoloWidth]
 
+        # Convert image to a LAB color space
+        # Then run clahe (histogram equalisation on it)
+        # Convert back to rgb
+        labImg = cv2.cvtColor(yoloImgL, cv2.COLOR_BGR2LAB)
+        labPlanes = cv2.split(labImg)
+        clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(6,6))
+        labPlanes[0] = clahe.apply(labPlanes[0])
+        labImg = cv2.merge(labPlanes)
+        yoloImgL = cv2.cvtColor(labImg, cv2.COLOR_LAB2BGR)
+
         # Copies yoloImgL to output image, which will have rects drawn on it
         yoloImgOutput = yoloImgL.copy()
 
