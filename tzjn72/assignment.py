@@ -52,7 +52,7 @@ pausePlayback = False  # pause until key press after each image
 
 # Disparity Mapping
 MAXDISPARITY = 128
-BLOCKSIZE = 7  # must be odd
+BLOCKSIZE = 9  # must be odd
 P1 = 600
 P2 = 4000
 DISP12MAXDIFF = 20
@@ -366,7 +366,7 @@ for imageNameL in imageNameListL:
             image = CLAHE.apply(image)
 
             # Gaussian Blur
-            windowSize = (9, 9)
+            windowSize = (7, 7)
             image = cv2.GaussianBlur(image, windowSize, windowSize[0]/6)
 
             # Median Blur
@@ -464,7 +464,7 @@ for imageNameL in imageNameListL:
         # Convert back to rgb
         labImg = cv2.cvtColor(yoloImgL, cv2.COLOR_BGR2LAB)
         labPlanes = cv2.split(labImg)
-        clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(6,6))
+        clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(6, 6))
         labPlanes[0] = clahe.apply(labPlanes[0])
         labImg = cv2.merge(labPlanes)
         yoloImgL = cv2.cvtColor(labImg, cv2.COLOR_LAB2BGR)
