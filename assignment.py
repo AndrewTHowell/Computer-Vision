@@ -40,7 +40,7 @@ SPECKLERANGE = 5  # 1 or 2
 MODE = 1  # MODE_SGBM = 0, MODE_HH = 1, MODE_SGBM_3WAY = 2, MODE_HH4 = 3
 
 # Raising to a power
-POWER = 0.75  # 0.75
+POWER = 0.8  # 0.75
 
 # CLAHE
 CLIPLIMIT = 5  # 2
@@ -425,8 +425,6 @@ for imageNameL in imageNameListL:
                                                  objectCentre[1])
 
                 objectDistance = centrePoint[2]
-                print("objectCentre: {0}".format(objectCentre))
-                print("objectDistance: {0}".format(objectDistance))
 
                 if (nearestObjectDistance is None
                     or objectDistance < nearestObjectDistance):
