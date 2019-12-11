@@ -23,6 +23,19 @@ master_path_to_dataset = "D:/howel/Videos/Computer Vision Coursework"
 
 # Section End
 
+# Section: parameters
+
+# Disparity Mapping
+MAXDISPARITY = 128
+BLOCKSIZE = 21
+P1
+P2
+DISP12MAXDIFFPREFILTERCAP,
+UNIQUENESSRATIO, SPECKLEWINDOWSIZE,
+SPECKLERANGE, MODE
+
+# Section End
+
 # Section: Constants
 
 SEACHINGFOR = {"person": (114, 20, 34),
@@ -162,8 +175,10 @@ def getOutputsNames(net):
 #    StereoSGBM_create(...)
 #        StereoSGBM_create(minDisparity, numDisparities, blockSize[, P1[, P2[,
 # disp12MaxDiff[, preFilterCap[, uniquenessRatio[, speckleWindowSize[, speckleRange[, mode]]]]]]]]) -> retval
-maxDisparity = 128
-stereoProcessor = cv2.StereoSGBM_create(0, maxDisparity, 21)
+stereoProcessor = cv2.StereoSGBM_create(0, MAXDISPARITY, BLOCKSIZE,
+                                        P1, P2, DISP12MAXDIFF, PREFILTERCAP,
+                                        UNIQUENESSRATIO, SPECKLEWINDOWSIZE,
+                                        SPECKLERANGE, MODE)
 
 # Section End
 
@@ -295,14 +310,14 @@ for imageNameL in imageNameListL:
 
         # Filter out noise and speckles (adjust parameters as needed)
         dispNoiseFilter = 5  # increase for more agressive filtering
-        cv2.filterSpeckles(disparity, 0, 4000, maxDisparity - dispNoiseFilter)
+        cv2.filterSpeckles(disparity, 0, 4000, MAXDISPARITY - dispNoiseFilter)
 
         # Region End
 
         # Region: Prep for/Display Disparity Images
 
         # Scale the disparity to 8-bit for viewing
-        _, disparity = cv2.threshold(disparity, 0, maxDisparity * 16,
+        _, disparity = cv2.threshold(disparity, 0, MAXDISPARITY * 16,
                                      cv2.THRESH_TOZERO)
         disparityScaled = (disparity / 16.).astype(np.uint8)
 
@@ -315,11 +330,11 @@ for imageNameL in imageNameListL:
 
         # display image (scaling it to the full 0->255 range based on the number
         # of disparities in use for the stereo part)
-        scaledUpDisparity = (disparityScaled * (256. / maxDisparity)).astype(np.uint8)
+        scaledUpDisparity = (disparityScaled * (256. / MAXDISPARITY)).astype(np.uint8)
         cv2.imshow("Disparity", scaledUpDisparity)
 
         # Now 3D
-        points3D = project_disparity_to_3d(disparityScaled, maxDisparity)
+        points3D = project_disparity_to_3d(disparityScaled, MAXDISPARITY)
 
         for i in range(10):
             print("points3D[i]: {0}".format(points3D[i]))
