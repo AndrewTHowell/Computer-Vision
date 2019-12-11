@@ -23,7 +23,9 @@ master_path_to_dataset = "D:/howel/Videos/Computer Vision Coursework"
 
 # Section End
 
-# Section: parameters
+# Section: Parameters
+
+# Region: Disparity
 
 # Disparity Mapping
 MAXDISPARITY = 128
@@ -37,6 +39,9 @@ SPECKLEWINDOWSIZE = 0  # 50-200
 SPECKLERANGE = 0  # 1 or 2
 MODE = 0  # MODE_SGBM = 0, MODE_HH = 1, MODE_SGBM_3WAY = 2, MODE_HH4 = 3
 
+# Raising to a power
+POWER = 0.75
+
 # CLAHE
 CLIPLIMIT = 2.0
 TILEGRIDSIZE = (8, 8)
@@ -45,6 +50,8 @@ TILEGRIDSIZE = (8, 8)
 MAXSPECKLESIZE = 4000
 DISPNOISEFILTER = 5  # increase for more agressive filtering
 MAXDIFF = MAXDISPARITY - DISPNOISEFILTER
+
+# Region End
 
 # Yolo
 CONFIDENCETHRESHOLD = 0.5  # Confidence threshold
@@ -314,7 +321,7 @@ for imageNameL in imageNameListL:
         processedImages = []
         for image in [grayL, grayR]:
             # Raise to the power, appears to improve subsequent disparity calculation
-            image = np.power(image, 0.75).astype('uint8')
+            image = np.power(image, POWER).astype('uint8')
 
             # https://www.researchgate.net/publication/260408103_Enhancement_Technique_for_Improving_the_Reliability_of_Disparity_Map_Under_Low_Light_Condition
 
@@ -344,7 +351,7 @@ for imageNameL in imageNameListL:
         windowSize = (5, 5)
         disparity = cv2.GaussianBlur(disparity, windowSize, windowSize[0]/6)
 
-        windowSize = (9, 9)
+        windowSize = (7, 7)
         disparity = cv2.GaussianBlur(disparity, windowSize, windowSize[0]/6)
 
         windowSize = 5
@@ -352,7 +359,7 @@ for imageNameL in imageNameListL:
 
         # Region End
 
-        # Region: Prep for/Display Disparity Images
+        # Region: Prep for Disparity Image
 
         # Scale the disparity to 8-bit for viewing
         _, disparity = cv2.threshold(disparity, 0, MAXDISPARITY * 16,
