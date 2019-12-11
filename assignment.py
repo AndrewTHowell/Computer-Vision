@@ -54,7 +54,7 @@ MAXDIFF = MAXDISPARITY - DISPNOISEFILTER
 # Region End
 
 # Yolo
-CONFIDENCETHRESHOLD = 0.5  # Confidence threshold
+CONFIDENCETHRESHOLD = 0.6  # Confidence threshold
 NMSTHRESHOLD = 0.4   # Non-maximum suppression threshold
 
 # Section End
@@ -230,15 +230,27 @@ startTimestamp = ""  # set to timestamp to skip forward to
 
 # Region End
 
-# Section: 2D disparity to 3D
+# Section: 2D disparity to 3D depth
 
 
-def project_disparity_to_3d(disparity, max_disparity, rgb=[]):
-
-    points = []
+def disparityPointTo3D(x, y):
+    # calculate corresponding 3D point [X, Y, Z]
+    # stereo lecture - slide 22 + 25
 
     f = camera_focal_length_px
     B = stereo_camera_baseline_m
+
+    Z = (f * B) / disparity[y, x]
+
+    X = ((x - image_centre_w) * Z) / f
+    Y = ((y - image_centre_h) * Z) / f
+
+    return [X, Y, Z]
+
+
+def disparityMapTo3D(disparity):
+
+    points = []
 
     height, width = disparity.shape[:2]
 
@@ -252,23 +264,11 @@ def project_disparity_to_3d(disparity, max_disparity, rgb=[]):
         for x in range(width):  # 0 - width is the x axis index
 
             # if we have a valid non-zero disparity
-
             if (disparity[y, x] > 0):
-
-                # calculate corresponding 3D point [X, Y, Z]
-
-                # stereo lecture - slide 22 + 25
-
-                Z = (f * B) / disparity[y, x]
-
-                X = ((x - image_centre_w) * Z) / f
-                Y = ((y - image_centre_h) * Z) / f
+                point = disparityMapTo3d(x, y)
 
                 # add to points
-                if len(rgb) > 0:
-                    points.append([X, Y, Z, rgb[y, x, 2], rgb[y, x, 1], rgb[y, x, 0]])
-                else:
-                    points.append([X, Y, Z])
+                points.append(point)
 
     return points
 
@@ -323,8 +323,6 @@ for imageNameL in imageNameListL:
             # Raise to the power, appears to improve subsequent disparity calculation
             image = np.power(image, POWER).astype('uint8')
 
-            # https://www.researchgate.net/publication/260408103_Enhancement_Technique_for_Improving_the_Reliability_of_Disparity_Map_Under_Low_Light_Condition
-
             image = CLAHE.apply(image)
 
             windowSize = (9, 9)
@@ -345,8 +343,6 @@ for imageNameL in imageNameListL:
 
         # Filter out noise and speckles (adjust parameters as needed)
         cv2.filterSpeckles(disparity, 0, MAXSPECKLESIZE, MAXDIFF)
-
-        # https://www.researchgate.net/publication/260408103_Enhancement_Technique_for_Improving_the_Reliability_of_Disparity_Map_Under_Low_Light_Condition
 
         windowSize = (5, 5)
         disparity = cv2.GaussianBlur(disparity, windowSize, windowSize[0]/6)
@@ -378,10 +374,7 @@ for imageNameL in imageNameListL:
         scaledUpDisparity = (disparityScaled * (256. / MAXDISPARITY)).astype(np.uint8)
 
         # Now 3D
-        points3D = project_disparity_to_3d(disparityScaled, MAXDISPARITY)
-
-        for i in range(10):
-            print("points3D[i]: {0}".format(points3D[i]))
+        #points3D = disparityMapTo3D(disparityScaled)
 
         # Region End
 
@@ -426,22 +419,13 @@ for imageNameL in imageNameListL:
                 width = box[2]
                 height = box[3]
 
-                # Get distance of object
-                # Get centre of object
-                if (cropDisparity):
-                    objectCentre = [top - (height//2), left + (width//2)]
-                else:
-                    objectCentre = [top - (height//2), left + (width//2)]
-                print("objectCentre: {0}".format(objectCentre))
+                objectCentre = [left + (width//2), top - (height//2)]
 
-                """
-                centreDisparity = scaledUpDisparity[objectCentre]
-                print("centreDisparity: {0}".format(centreDisparity))
+                centrePoint = disparityPointTo3D(objectCentre[0], objectCentre[1])
 
-                objectDistance = (FOCALLENGTH
-                                  * (BASELINEDISTANCE/centreDisparity))
-                """
-                objectDistance = 0.1
+                print("centrePoint: {0}".format(centrePoint))
+
+                objectDistance = centrePoint[2]
 
                 drawPred(yoloImgL,
                          objectName,
@@ -467,8 +451,8 @@ for imageNameL in imageNameListL:
                     0.5, (0, 0, 255))
 
         # display images
-        #cv2.imshow('Right image', imgR)
-        #cv2.imshow('Left image', imgL)
+        # cv2.imshow('Right image', imgR)
+        # cv2.imshow('Left image', imgL)
         cv2.imshow(windowName, yoloImgL)
         cv2.resizeWindow(windowName, yoloImgL.shape[1], yoloImgL.shape[0])
         cv2.imshow("Disparity", scaledUpDisparity)
