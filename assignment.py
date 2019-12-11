@@ -29,26 +29,26 @@ master_path_to_dataset = "D:/howel/Videos/Computer Vision Coursework"
 
 # Disparity Mapping
 MAXDISPARITY = 128
-BLOCKSIZE = 21
-P1 = 0
-P2 = 0
-DISP12MAXDIFF = 0
-PREFILTERCAP = 0
-UNIQUENESSRATIO = 0  # 5-15
-SPECKLEWINDOWSIZE = 0  # 50-200
-SPECKLERANGE = 0  # 1 or 2
-MODE = 0  # MODE_SGBM = 0, MODE_HH = 1, MODE_SGBM_3WAY = 2, MODE_HH4 = 3
+BLOCKSIZE = 7
+P1 = 600
+P2 = 4000
+DISP12MAXDIFF = 20
+PREFILTERCAP = 16
+UNIQUENESSRATIO = 3  # 5-15
+SPECKLEWINDOWSIZE = 100  # 50-200
+SPECKLERANGE = 20  # 1 or 2
+MODE = 1  # MODE_SGBM = 0, MODE_HH = 1, MODE_SGBM_3WAY = 2, MODE_HH4 = 3
 
 # Raising to a power
-POWER = 0.75
+POWER = 0.75  # 0.75
 
 # CLAHE
-CLIPLIMIT = 2.0
-TILEGRIDSIZE = (8, 8)
+CLIPLIMIT = 8  # 2
+TILEGRIDSIZE = (9, 9)
 
 # Speckle Filtering
-MAXSPECKLESIZE = 4000
-DISPNOISEFILTER = 5  # increase for more agressive filtering
+MAXSPECKLESIZE = 3000
+DISPNOISEFILTER = 10  # increase for more agressive filtering
 MAXDIFF = MAXDISPARITY - DISPNOISEFILTER
 
 # Region End
@@ -221,8 +221,8 @@ net.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL)
 
 # Region: User input variables
 
-cropDisparity = False  # display full or cropped disparity image
-pausePlayback = False  # pause until key press after each image
+cropDisparity = True  # display full or cropped disparity image
+pausePlayback = True  # pause until key press after each image
 
 # set this to a file timestamp to start from (empty is first example - outside lab)
 # e.g. set to 1506943191.487683 for the end of the Bailey, just as the vehicle turns
@@ -348,10 +348,10 @@ for imageNameL in imageNameListL:
         disparity = cv2.GaussianBlur(disparity, windowSize, windowSize[0]/6)
 
         windowSize = (7, 7)
-        disparity = cv2.GaussianBlur(disparity, windowSize, windowSize[0]/6)
+        #disparity = cv2.GaussianBlur(disparity, windowSize, windowSize[0]/6)
 
         windowSize = 5
-        disparity = cv2.medianBlur(disparity, windowSize)
+        #disparity = cv2.medianBlur(disparity, windowSize)
 
         # Region End
 
@@ -388,8 +388,6 @@ for imageNameL in imageNameListL:
         yoloWidth = yoloImgL.shape[1]
         yoloHeight = yoloImgL.shape[0]
 
-        print("yoloImgL.shape: {0}".format(yoloImgL.shape))
-
         # start a timer (to see how long processing and display takes)
         start_t = cv2.getTickCount()
 
@@ -405,10 +403,12 @@ for imageNameL in imageNameListL:
 
         # remove the bounding boxes with low confidence
         classIDs, confidences, boxes = postprocess(yoloImgL, results,
-                                                   CONFIDENCETHRESHOLD, NMSTHRESHOLD)
+                                                   CONFIDENCETHRESHOLD,
+                                                   NMSTHRESHOLD)
 
         # Region: Draw rects on image
 
+        nearestObjectDistance = None
         # draw resulting detections on image
         for detected_object in range(0, len(boxes)):
             objectName = classes[classIDs[detected_object]]
@@ -421,11 +421,16 @@ for imageNameL in imageNameListL:
 
                 objectCentre = [left + (width//2), top - (height//2)]
 
-                centrePoint = disparityPointTo3D(objectCentre[0], objectCentre[1])
-
-                print("centrePoint: {0}".format(centrePoint))
+                centrePoint = disparityPointTo3D(objectCentre[0],
+                                                 objectCentre[1])
 
                 objectDistance = centrePoint[2]
+                print("objectCentre: {0}".format(objectCentre))
+                print("objectDistance: {0}".format(objectDistance))
+
+                if (nearestObjectDistance is None
+                    or objectDistance < nearestObjectDistance):
+                    nearestObjectDistance = objectDistance
 
                 drawPred(yoloImgL,
                          objectName,
@@ -450,6 +455,11 @@ for imageNameL in imageNameListL:
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (0, 0, 255))
 
+        # stop the timer and convert to ms. (to see how long processing and display takes)
+        stop_t = ((cv2.getTickCount() - start_t)/cv2.getTickFrequency()) * 1000
+
+        # Region End
+
         # display images
         # cv2.imshow('Right image', imgR)
         # cv2.imshow('Left image', imgL)
@@ -457,12 +467,7 @@ for imageNameL in imageNameListL:
         cv2.resizeWindow(windowName, yoloImgL.shape[1], yoloImgL.shape[0])
         cv2.imshow("Disparity", scaledUpDisparity)
 
-        # stop the timer and convert to ms. (to see how long processing and display takes)
-        stop_t = ((cv2.getTickCount() - start_t)/cv2.getTickFrequency()) * 1000
 
-        # Region End
-
-        nearestObjectDistance = -1.0
 
         # Output filenames and nearest detected scene object
         print("{0}.png\n{1}.png : nearest detected scene object ({2:.1f}m)"
