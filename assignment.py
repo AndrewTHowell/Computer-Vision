@@ -18,6 +18,8 @@
 # crop - c
 # pause the 'video' - space
 
+# Using PEP8
+
 # Section: Import modules
 
 import cv2
@@ -31,11 +33,16 @@ import math
 
 # Section: User variables
 
+# Path to where your dataset is stored
 master_path_to_dataset = "D:/howel/Videos/Computer Vision Coursework"
 
 # set this to a file timestamp to start from (empty is first example - outside lab)
 # e.g. set to 1506943191.487683 for the end of the Bailey, just as the vehicle turns
 startTimestamp = ""  # set to timestamp to skip forward to
+
+cropDisparity = True  # display full or cropped disparity image
+
+pausePlayback = True  # pause until key press after each image
 
 # Section End
 
@@ -45,7 +52,7 @@ startTimestamp = ""  # set to timestamp to skip forward to
 
 # Disparity Mapping
 MAXDISPARITY = 128
-BLOCKSIZE = 7
+BLOCKSIZE = 7  # must be odd
 P1 = 600
 P2 = 4000
 DISP12MAXDIFF = 20
@@ -55,7 +62,7 @@ SPECKLEWINDOWSIZE = 125  # 50-200
 SPECKLERANGE = 5  # 1 or 2
 MODE = 1  # MODE_SGBM = 0, MODE_HH = 1, MODE_SGBM_3WAY = 2, MODE_HH4 = 3
 
-# Raising to a power
+# Raising gray pixel values to a power
 POWER = 0.8  # 0.75
 
 # CLAHE
@@ -69,7 +76,7 @@ MAXDIFF = MAXDISPARITY - DISPNOISEFILTER
 
 # Region End
 
-# Yolo
+# YOLO Parameters
 CONFIDENCETHRESHOLD = 0.6  # Confidence threshold
 NMSTHRESHOLD = 0.4   # Non-maximum suppression threshold
 
@@ -113,7 +120,19 @@ weights_file = os.path.join(currentDirectoryPath, "yolov3.weights")
 
 # Section End
 
-# Section: Yolo functions
+# Section: Create stereoProcessor object
+
+# setup the disparity stereo processor to find a maximum of 128 disparity values
+stereoProcessor = cv2.StereoSGBM_create(0, MAXDISPARITY, BLOCKSIZE,
+                                        P1, P2, DISP12MAXDIFF, PREFILTERCAP,
+                                        UNIQUENESSRATIO, SPECKLEWINDOWSIZE,
+                                        SPECKLERANGE, MODE)
+
+# Section End
+
+# Section: YOLO
+
+# Section: YOLO functions
 
 
 # dummy on trackbar callback function
@@ -199,23 +218,9 @@ def getOutputsNames(net):
     return [layersNames[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 
 
-# Section End
+# Region End
 
-# Section: Create stereoProcessor object
-
-# setup the disparity stereo processor to find a maximum of 128 disparity values
-# (adjust parameters if needed - this will effect speed to processing)
-#    StereoSGBM_create(...)
-#        StereoSGBM_create(minDisparity, numDisparities, blockSize[, P1[, P2[,
-# disp12MaxDiff[, preFilterCap[, uniquenessRatio[, speckleWindowSize[, speckleRange[, mode]]]]]]]]) -> retval
-stereoProcessor = cv2.StereoSGBM_create(0, MAXDISPARITY, BLOCKSIZE,
-                                        P1, P2, DISP12MAXDIFF, PREFILTERCAP,
-                                        UNIQUENESSRATIO, SPECKLEWINDOWSIZE,
-                                        SPECKLERANGE, MODE)
-
-# Section End
-
-# Section: Create yolo object
+# Region: Create YOLO object
 
 # Load names of classes from file
 classesFile = class_file
@@ -233,14 +238,9 @@ net.setPreferableBackend(cv2.dnn.DNN_BACKEND_DEFAULT)
 # change to cv2.dnn.DNN_TARGET_CPU (slower) if this causes issues (should fail gracefully if OpenCL not available)
 net.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL)
 
-# Section End
-
-# Region: User input variables
-
-cropDisparity = True  # display full or cropped disparity image
-pausePlayback = True  # pause until key press after each image
-
 # Region End
+
+# Section End
 
 # Section: 2D disparity to 3D depth
 
@@ -289,6 +289,7 @@ def disparityMapTo3D(disparity):
 
 # Section: CLAHE Instantiation
 
+# Create CLAHE (Histogram equalisation) object with given parameters
 CLAHE = cv2.createCLAHE(CLIPLIMIT, TILEGRIDSIZE)
 
 # Section End
@@ -437,28 +438,23 @@ for imageNameL in imageNameListL:
 
                 # Calculate distance to object
 
+                # Find the centre of the object
                 objectCentre = [left + (width//2), top + (height//2)]
-                print("{0} objectCentre: {1}".format(i, objectCentre))
 
+                # If centre is outside of image / cropped image, ignore object
+                # This stops the bonnet being included
                 if (objectCentre[1] > scaledUpDisparity.shape[0]
                     or objectCentre[0] > scaledUpDisparity.shape[1]):
                     continue
 
-                """
-                drawPred(yoloImgL,
-                         str(i) + ": " + objectName,
-                         0,
-                         objectCentre[0] - 5, objectCentre[1] - 5,
-                         objectCentre[0] + 5, objectCentre[1] + 5,
-                         SEACHINGFOR[objectName])
-                """
-
+                # Get 3D coordinates of centre point of object
                 centrePoint = disparityPointTo3D(objectCentre[0],
                                                  objectCentre[1],
                                                  scaledUpDisparity)
+                # Depth of centre point
                 objectDistance = centrePoint[2]
 
-                #objectDi yoloImgL[][]
+                # objectDi yoloImgL[][] ###################################
 
                 # If nearest object, update nearestObjectDistance
                 if (nearestObjectDistance is None
@@ -467,16 +463,14 @@ for imageNameL in imageNameListL:
 
                 # Draw the correpsonding rect on the Yolo image
                 drawPred(yoloImgL,
-                         str(i) + ": " + objectName,
+                         objectName,
                          objectDistance,
                          left, top, left + width, top + height,
                          SEACHINGFOR[objectName])
 
-                i += 1
-
         # Region End
 
-        # If cropping wanted:
+        # If cropping wanted, crop the YOLO image
         if (cropDisparity):
             # Crop left part of disparity image where not seen by both cameras
             # Crop out the car bonnet
@@ -495,21 +489,20 @@ for imageNameL in imageNameListL:
 
         # Region End
 
-        # display images
-        # cv2.imshow('Right image', imgR)
-        # cv2.imshow('Left image', imgL)
+        # display yolo image
         cv2.imshow(windowName, yoloImgL)
         cv2.resizeWindow(windowName, yoloImgL.shape[1], yoloImgL.shape[0])
+
+        # display disparity image
         cv2.imshow("Disparity", scaledUpDisparity)
 
-
-
-        # Output filenames and nearest detected scene object
+        # Output filenames and nearest detected scene object ()
         if nearestObjectDistance is not None:
             print("{0}.png\n{1}.png : nearest detected scene object ({2:.1f}m)"
                   .format(imageNameL, imageNameR, nearestObjectDistance))
         else:
-            print("{0}.png\n{1}.png".format(imageNameL, imageNameR))
+            print("{0}.png\n{1}.png : nearest detected scene object (N/A)"
+                  .format(imageNameL, imageNameR))
 
         # exit - x
         # save - s
