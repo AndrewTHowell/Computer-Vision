@@ -311,11 +311,16 @@ for imageNameL in imageNameListL:
             # Raise to the power, appears to improve subsequent disparity calculation
             image = np.power(image, 0.75).astype('uint8')
 
+            image = CLAHE.apply(image)
+
             windowSize = (9, 9)
             image = cv2.GaussianBlur(image, windowSize, windowsSize[0]/6)
 
             windowSize = 9
             image = cv2.medianBlur(image, windowSize)
+
+            processedImages.append(image)
+        [grayL, grayR] = processedImages
 
         # Region End
 
@@ -327,6 +332,15 @@ for imageNameL in imageNameListL:
         # Filter out noise and speckles (adjust parameters as needed)
         dispNoiseFilter = 5  # increase for more agressive filtering
         cv2.filterSpeckles(disparity, 0, 4000, MAXDISPARITY - dispNoiseFilter)
+
+        windowSize = (5, 5)
+        disparity = cv2.GaussianBlur(disparity, windowSize, windowsSize[0]/6)
+
+        windowSize = (9, 9)
+        disparity = cv2.GaussianBlur(disparity, windowSize, windowsSize[0]/6)
+
+        windowSize = 5
+        disparity = cv2.medianBlur(disparity, windowSize)
 
         # Region End
 
