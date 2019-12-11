@@ -41,6 +41,10 @@ MODE = 0  # MODE_SGBM = 0, MODE_HH = 1, MODE_SGBM_3WAY = 2, MODE_HH4 = 3
 CONFIDENCETHRESHOLD = 0.5  # Confidence threshold
 NMSTHRESHOLD = 0.4   # Non-maximum suppression threshold
 
+# CLAHE
+CLIPLIMIT = 2.0
+TILEGRIDSIZE = (8, 8)
+
 # Section End
 
 # Section: Constants
@@ -259,6 +263,12 @@ def project_disparity_to_3d(disparity, max_disparity, rgb=[]):
 
 # Section End
 
+# Section: CLAHE Instantiation
+
+CLAHE = cv2.createCLAHE(CLIPLIMIT, TILEGRIDSIZE)
+
+# Section End
+
 # Section: Iteration through image files
 
 for imageNameL in imageNameListL:
@@ -282,13 +292,11 @@ for imageNameL in imageNameListL:
     # image actually exists
     if ('.png' in imageNameL) and (os.path.isfile(fullPathRightImage)):
 
-        # Region: Display left and right images
+        # Region: Read left and right images
 
         # Read left and right images and display in windows
         imgL = cv2.imread(fullPathLeftImage, cv2.IMREAD_COLOR)
-        cv2.imshow('Left image', imgL)
         imgR = cv2.imread(fullPathRightImage, cv2.IMREAD_COLOR)
-        cv2.imshow('Right image', imgR)
 
         # Region End
 
@@ -298,9 +306,16 @@ for imageNameL in imageNameListL:
 
         # Region: PREPROCESSING
 
-        # Raise to the power, appears to improve subsequent disparity calculation
-        grayL = np.power(grayL, 0.75).astype('uint8')
-        grayR = np.power(grayR, 0.75).astype('uint8')
+        processedImages = []
+        for image in [grayL, grayR]:
+            # Raise to the power, appears to improve subsequent disparity calculation
+            image = np.power(image, 0.75).astype('uint8')
+
+            windowSize = (9, 9)
+            image = cv2.GaussianBlur(image, windowSize, windowsSize[0]/6)
+
+            windowSize = 9
+            image = cv2.medianBlur(image, windowSize)
 
         # Region End
 
@@ -423,7 +438,9 @@ for imageNameL in imageNameListL:
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (0, 0, 255))
 
-        # display image
+        # display images
+        cv2.imshow('Right image', imgR)
+        cv2.imshow('Left image', imgL)
         cv2.imshow(windowName, yoloImgL)
         cv2.resizeWindow(windowName, yoloImgL.shape[1], yoloImgL.shape[0])
 
