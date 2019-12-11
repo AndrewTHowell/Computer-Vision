@@ -555,12 +555,10 @@ for imageNameL in imageNameListL:
         cv2.imshow("Disparity", scaledUpDisparity)
 
         # Output filenames and nearest detected scene object ()
-        if nearestObjectDistance is not None:
-            print("{0}.png\n{1}.png : nearest detected scene object ({2:.1f}m)"
-                  .format(imageNameL, imageNameR, nearestObjectDistance))
-        else:
-            print("{0}.png\n{1}.png : nearest detected scene object (N/A)"
-                  .format(imageNameL, imageNameR))
+        if nearestObjectDistance is None:
+            nearestObjectDistance = 0.0
+        print("{0}.png\n{1}.png : nearest detected scene object ({2:.1f}m)"
+              .format(imageNameL, imageNameR, nearestObjectDistance))
 
         # exit - x
         # save - s
