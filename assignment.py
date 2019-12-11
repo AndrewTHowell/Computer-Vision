@@ -36,13 +36,13 @@ import math
 # Path to where your dataset is stored
 master_path_to_dataset = "D:/howel/Videos/Computer Vision Coursework"
 
-# set this to a file timestamp to start from (empty is first example - outside lab)
-# e.g. set to 1506943191.487683 for the end of the Bailey, just as the vehicle turns
+# set this to a file timestamp to start from
+# e.g. set to 1506943191.487683 for the end of the Bailey
 startTimestamp = ""  # set to timestamp to skip forward to
 
 cropDisparity = True  # display full or cropped disparity image
 
-pausePlayback = True  # pause until key press after each image
+pausePlayback = False  # pause until key press after each image
 
 # Section End
 
@@ -61,6 +61,7 @@ UNIQUENESSRATIO = 3  # 5-15
 SPECKLEWINDOWSIZE = 125  # 50-200
 SPECKLERANGE = 5  # 1 or 2
 MODE = 1  # MODE_SGBM = 0, MODE_HH = 1, MODE_SGBM_3WAY = 2, MODE_HH4 = 3
+PERCENTILE = 25
 
 # Raising gray pixel values to a power
 POWER = 0.8  # 0.75
@@ -76,9 +77,13 @@ MAXDIFF = MAXDISPARITY - DISPNOISEFILTER
 
 # Region End
 
+# Region: YOLO
+
 # YOLO Parameters
 CONFIDENCETHRESHOLD = 0.6  # Confidence threshold
 NMSTHRESHOLD = 0.4   # Non-maximum suppression threshold
+
+# Region End
 
 # Section End
 
@@ -122,7 +127,7 @@ weights_file = os.path.join(currentDirectoryPath, "yolov3.weights")
 
 # Section: Create stereoProcessor object
 
-# setup the disparity stereo processor to find a maximum of 128 disparity values
+# setup the disparity stereo processor to find a max of 128 disparity values
 stereoProcessor = cv2.StereoSGBM_create(0, MAXDISPARITY, BLOCKSIZE,
                                         P1, P2, DISP12MAXDIFF, PREFILTERCAP,
                                         UNIQUENESSRATIO, SPECKLEWINDOWSIZE,
@@ -153,11 +158,15 @@ def drawPred(image, class_name, distance, left, top, right, bottom, colour):
     label = "{0}: {1:.2f}m".format(class_name, distance)
 
     # Display the label at the top of the bounding box
-    labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+    labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX,
+                                          0.5, 1)
     top = max(top, labelSize[1])
     cv2.rectangle(image, (left, top - round(1.5*labelSize[1])),
-                  (left + round(1.5*labelSize[0]), top + baseLine), (255, 255, 255), cv2.FILLED)
-    cv2.putText(image, label, (left, top), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 1)
+                  (left + round(1.5*labelSize[0]), top + baseLine),
+                  (255, 255, 255), cv2.FILLED)
+
+    cv2.putText(image, label, (left, top),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 1)
 
 
 # Remove the bounding boxes with low confidence using non-maxima suppression
@@ -192,13 +201,14 @@ def postprocess(image, results, threshold_confidence, threshold_nms):
                 confidences.append(float(confidence))
                 boxes.append([left, top, width, height])
 
-    # Perform non maximum suppression to eliminate redundant overlapping boxes with
-    # lower confidences
+    # Perform non maximum suppression to eliminate redundant overlapping boxes
+    # with lower confidences
     classIds_nms = []
     confidences_nms = []
     boxes_nms = []
 
-    indices = cv2.dnn.NMSBoxes(boxes, confidences, threshold_confidence, threshold_nms)
+    indices = cv2.dnn.NMSBoxes(boxes, confidences,
+                               threshold_confidence, threshold_nms)
     for i in indices:
         i = i[0]
         classIds_nms.append(classIds[i])
@@ -214,7 +224,8 @@ def postprocess(image, results, threshold_confidence, threshold_nms):
 def getOutputsNames(net):
     # Get the names of all the layers in the network
     layersNames = net.getLayerNames()
-    # Get the names of the output layers, i.e. the layers with unconnected outputs
+    # Get the names of the output layers
+    # i.e. the layers with unconnected outputs
     return [layersNames[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 
 
@@ -228,14 +239,16 @@ classes = None
 with open(classesFile, 'rt') as f:
     classes = f.read().rstrip('\n').split('\n')
 
-# load configuration and weight files for the model and load the network using them
+# load configuration and weight files for the model and load the network
 net = cv2.dnn.readNetFromDarknet(config_file, weights_file)
 output_layer_names = getOutputsNames(net)
 
-# defaults DNN_BACKEND_INFERENCE_ENGINE if Intel Inference Engine lib available or DNN_BACKEND_OPENCV otherwise
+# defaults DNN_BACKEND_INFERENCE_ENGINE if Intel Inference Engine lib available
+# or DNN_BACKEND_OPENCV otherwise
 net.setPreferableBackend(cv2.dnn.DNN_BACKEND_DEFAULT)
 
-# change to cv2.dnn.DNN_TARGET_CPU (slower) if this causes issues (should fail gracefully if OpenCL not available)
+# change to cv2.dnn.DNN_TARGET_CPU (slower) if this causes issues (should fail
+# gracefully if OpenCL not available)
 net.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL)
 
 # Region End
@@ -243,6 +256,17 @@ net.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL)
 # Section End
 
 # Section: 2D disparity to 3D depth
+
+
+def disparitytoDepth(disparity):
+    # stereo lecture - slide 22 + 25
+
+    f = camera_focal_length_px
+    B = stereo_camera_baseline_m
+
+    Z = (f * B) / disparity
+
+    return Z
 
 
 def disparityPointTo3D(x, y, disparity):
@@ -334,7 +358,8 @@ for imageNameL in imageNameListL:
         processedImages = []
         # for left and right image
         for image in [grayL, grayR]:
-            # Raise to the power, appears to improve subsequent disparity calculation
+            # Raise to the power, appears to improve subsequent disparity
+            # calculation
             image = np.power(image, POWER).astype('uint8')
 
             # Histogram Equalisation
@@ -385,9 +410,10 @@ for imageNameL in imageNameListL:
             # Crop out the car bonnet
             disparityScaled = disparityScaled[0:390, 135:width]
 
-        # display image (scaling it to the full 0->255 range based on the number
-        # of disparities in use for the stereo part)
-        scaledUpDisparity = (disparityScaled * (256. / MAXDISPARITY)).astype(np.uint8)
+        # display image (scaling it to the full 0->255 range based on the
+        # number of disparities in use for the stereo part)
+        scaledUpDisparity = ((disparityScaled * (256. / MAXDISPARITY))
+                             .astype(np.uint8))
 
         # Region End
 
@@ -405,8 +431,10 @@ for imageNameL in imageNameListL:
         # start a timer (to see how long processing and display takes)
         start_t = cv2.getTickCount()
 
-        # create a 4D tensor (OpenCV 'blob') from imgL (pixels scaled 0->1, image resized)
-        tensor = cv2.dnn.blobFromImage(yoloImgL, 1/255, (yoloWidth, yoloHeight),
+        # create a 4D tensor (OpenCV 'blob') from imgL (pixels scaled 0->1,
+        # image resized)
+        tensor = cv2.dnn.blobFromImage(yoloImgL, 1/255,
+                                       (yoloWidth, yoloHeight),
                                        [0, 0, 0], 1, crop=False)
 
         # set the input to the CNN network
@@ -425,6 +453,15 @@ for imageNameL in imageNameListL:
         # Keep track of closest object in each frame
         nearestObjectDistance = None
 
+        # If cropping wanted, crop the YOLO image
+        if (cropDisparity):
+            # Crop left part of disparity image where not seen by both cameras
+            # Crop out the car bonnet
+            yoloImgL = yoloImgL[0:390, 135:yoloWidth]
+
+        # Copies yoloImgL to output image, which will have rects drawn on it
+        yoloImgOutput = yoloImgL.copy()
+
         # draw resulting detections on image
         for detected_object in range(0, len(boxes)):
             objectName = classes[classIDs[detected_object]]
@@ -436,8 +473,6 @@ for imageNameL in imageNameListL:
                 width = box[2]
                 height = box[3]
 
-                # Calculate distance to object
-
                 # Find the centre of the object
                 objectCentre = [left + (width//2), top + (height//2)]
 
@@ -447,14 +482,38 @@ for imageNameL in imageNameListL:
                     or objectCentre[0] > scaledUpDisparity.shape[1]):
                     continue
 
+                # Calculate distance to object
+
+                # Reduce the box so it doesn't exceed image (cropping)
+                # Cropping: [0:390, 135:width]
+                if cropDisparity:
+                    # Translate coordinates
+                    left -= 135
+
+                if top < 0:
+                    top = 0
+                if top + height > scaledUpDisparity.shape[0]:
+                    height = scaledUpDisparity.shape[0] - top
+                if left < 0:
+                    left = 0
+                if left + width > scaledUpDisparity.shape[1]:
+                    width = scaledUpDisparity.shape[1] - left
+
+                objectSpace = scaledUpDisparity[top:top + height,
+                                                left:left + width]
+
+                firstQuartileDisparity = np.percentile(objectSpace, PERCENTILE)
+
+                objectDistance = disparitytoDepth(firstQuartileDisparity)
+
+                """
                 # Get 3D coordinates of centre point of object
                 centrePoint = disparityPointTo3D(objectCentre[0],
                                                  objectCentre[1],
                                                  scaledUpDisparity)
                 # Depth of centre point
                 objectDistance = centrePoint[2]
-
-                # objectDi yoloImgL[][] ###################################
+                """
 
                 # If nearest object, update nearestObjectDistance
                 if (nearestObjectDistance is None
@@ -462,7 +521,7 @@ for imageNameL in imageNameListL:
                     nearestObjectDistance = objectDistance
 
                 # Draw the correpsonding rect on the Yolo image
-                drawPred(yoloImgL,
+                drawPred(yoloImgOutput,
                          objectName,
                          objectDistance,
                          left, top, left + width, top + height,
@@ -470,28 +529,27 @@ for imageNameL in imageNameListL:
 
         # Region End
 
-        # If cropping wanted, crop the YOLO image
-        if (cropDisparity):
-            # Crop left part of disparity image where not seen by both cameras
-            # Crop out the car bonnet
-            yoloImgL = yoloImgL[0:390, 135:yoloWidth]
-
-        # Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
+        # Put efficiency information. The function getPerfProfile returns the
+        # overall time for inference(t) and the timings for each of the
+        # layers(in layersTimes)
         t, _ = net.getPerfProfile()
-        label = 'Inference time: %.2f ms' % (t * 1000.0 / cv2.getTickFrequency())
-        cv2.putText(yoloImgL, label,
+        label = ('Inference time: %.2f ms'
+                 % (t * 1000.0 / cv2.getTickFrequency()))
+        cv2.putText(yoloImgOutput, label,
                     (0, 15),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.5, (0, 0, 255))
 
-        # stop the timer and convert to ms. (to see how long processing and display takes)
+        # stop the timer and convert to ms. (to see how long processing and
+        # display takes)
         stop_t = ((cv2.getTickCount() - start_t)/cv2.getTickFrequency()) * 1000
 
         # Region End
 
         # display yolo image
-        cv2.imshow(windowName, yoloImgL)
-        cv2.resizeWindow(windowName, yoloImgL.shape[1], yoloImgL.shape[0])
+        cv2.imshow(windowName, yoloImgOutput)
+        cv2.resizeWindow(windowName,
+                         yoloImgOutput.shape[1], yoloImgOutput.shape[0])
 
         # display disparity image
         cv2.imshow("Disparity", scaledUpDisparity)
@@ -512,7 +570,8 @@ for imageNameL in imageNameListL:
 
         desiredFPS = 25
         keyDelay = 1000 / desiredFPS  # e.g: 1000ms / 25 fps = 40 ms)
-        key = cv2.waitKey(max(2, keyDelay - int(math.ceil(stop_t))) * (not(pausePlayback))) & 0xFF
+        key = (cv2.waitKey(max(2, keyDelay - int(math.ceil(stop_t)))
+                           * (not(pausePlayback))) & 0xFF)
 
         # keyboard input for exit (as standard), save disparity and cropping
         if (key == ord('x')):       # exit
