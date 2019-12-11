@@ -37,18 +37,18 @@ SPECKLEWINDOWSIZE = 0  # 50-200
 SPECKLERANGE = 0  # 1 or 2
 MODE = 0  # MODE_SGBM = 0, MODE_HH = 1, MODE_SGBM_3WAY = 2, MODE_HH4 = 3
 
-# Yolo
-CONFIDENCETHRESHOLD = 0.5  # Confidence threshold
-NMSTHRESHOLD = 0.4   # Non-maximum suppression threshold
-
 # CLAHE
 CLIPLIMIT = 2.0
 TILEGRIDSIZE = (8, 8)
 
-# Speckle FIltering
+# Speckle Filtering
 MAXSPECKLESIZE = 4000
 DISPNOISEFILTER = 5  # increase for more agressive filtering
 MAXDIFF = MAXDISPARITY - DISPNOISEFILTER
+
+# Yolo
+CONFIDENCETHRESHOLD = 0.5  # Confidence threshold
+NMSTHRESHOLD = 0.4   # Non-maximum suppression threshold
 
 # Section End
 
@@ -316,6 +316,8 @@ for imageNameL in imageNameListL:
             # Raise to the power, appears to improve subsequent disparity calculation
             image = np.power(image, 0.75).astype('uint8')
 
+            # https://www.researchgate.net/publication/260408103_Enhancement_Technique_for_Improving_the_Reliability_of_Disparity_Map_Under_Low_Light_Condition
+
             image = CLAHE.apply(image)
 
             windowSize = (9, 9)
@@ -336,6 +338,8 @@ for imageNameL in imageNameListL:
 
         # Filter out noise and speckles (adjust parameters as needed)
         cv2.filterSpeckles(disparity, 0, MAXSPECKLESIZE, MAXDIFF)
+
+        # https://www.researchgate.net/publication/260408103_Enhancement_Technique_for_Improving_the_Reliability_of_Disparity_Map_Under_Low_Light_Condition
 
         windowSize = (5, 5)
         disparity = cv2.GaussianBlur(disparity, windowSize, windowSize[0]/6)
