@@ -222,7 +222,7 @@ net.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL)
 # Region: User input variables
 
 cropDisparity = True  # display full or cropped disparity image
-pausePlayback = False  # pause until key press after each image
+pausePlayback = True  # pause until key press after each image
 
 # set this to a file timestamp to start from (empty is first example - outside lab)
 # e.g. set to 1506943191.487683 for the end of the Bailey, just as the vehicle turns
@@ -233,7 +233,7 @@ startTimestamp = ""  # set to timestamp to skip forward to
 # Section: 2D disparity to 3D depth
 
 
-def disparityPointTo3D(x, y):
+def disparityPointTo3D(x, y, disparity):
     # calculate corresponding 3D point [X, Y, Z]
     # stereo lecture - slide 22 + 25
 
@@ -265,7 +265,7 @@ def disparityMapTo3D(disparity):
 
             # if we have a valid non-zero disparity
             if (disparity[y, x] > 0):
-                point = disparityMapTo3d(x, y)
+                point = disparityMapTo3d(x, y, disparity)
 
                 # add to points
                 points.append(point)
@@ -319,15 +319,19 @@ for imageNameL in imageNameListL:
         # Region: PREPROCESSING
 
         processedImages = []
+        # for left and right image
         for image in [grayL, grayR]:
             # Raise to the power, appears to improve subsequent disparity calculation
             image = np.power(image, POWER).astype('uint8')
 
+            # Histogram Equalisation
             image = CLAHE.apply(image)
 
+            # Gaussian Blur
             windowSize = (9, 9)
             image = cv2.GaussianBlur(image, windowSize, windowSize[0]/6)
 
+            # Median Blur
             windowSize = 9
             image = cv2.medianBlur(image, windowSize)
 
@@ -344,14 +348,13 @@ for imageNameL in imageNameListL:
         # Filter out noise and speckles (adjust parameters as needed)
         cv2.filterSpeckles(disparity, 0, MAXSPECKLESIZE, MAXDIFF)
 
+        # Gaussian Blur
         windowSize = (5, 5)
         disparity = cv2.GaussianBlur(disparity, windowSize, windowSize[0]/6)
 
-        windowSize = (7, 7)
-        #disparity = cv2.GaussianBlur(disparity, windowSize, windowSize[0]/6)
-
+        # Median Blur - removes salt and pepper noise
         windowSize = 5
-        #disparity = cv2.medianBlur(disparity, windowSize)
+        disparity = cv2.medianBlur(disparity, windowSize)
 
         # Region End
 
@@ -373,13 +376,11 @@ for imageNameL in imageNameListL:
         # of disparities in use for the stereo part)
         scaledUpDisparity = (disparityScaled * (256. / MAXDISPARITY)).astype(np.uint8)
 
-        # Now 3D
-        #points3D = disparityMapTo3D(disparityScaled)
-
         # Region End
 
         # Region: YOLO
 
+        # Create Left (Colour) Image window for Yolo detection rectangles
         windowName = "YOLO"
         cv2.namedWindow(windowName, cv2.WINDOW_NORMAL)
 
@@ -408,10 +409,16 @@ for imageNameL in imageNameListL:
 
         # Region: Draw rects on image
 
+        # Keep track of closest object in each frame
         nearestObjectDistance = None
+
+        print("scaledUpDisparity.shape: {0}".format(scaledUpDisparity.shape))
+
         # draw resulting detections on image
+        i = 0
         for detected_object in range(0, len(boxes)):
             objectName = classes[classIDs[detected_object]]
+            # If object is a person or vehicle
             if objectName in SEACHINGFOR:
                 box = boxes[detected_object]
                 left = box[0]
@@ -419,22 +426,45 @@ for imageNameL in imageNameListL:
                 width = box[2]
                 height = box[3]
 
-                objectCentre = [left + (width//2), top - (height//2)]
+                # Calculate distance to object
+
+                objectCentre = [left + (width//2), top + (height//2)]
+                print("{0} objectCentre: {1}".format(i, objectCentre))
+
+                if (objectCentre[1] > scaledUpDisparity.shape[0]
+                    or objectCentre[0] > scaledUpDisparity.shape[1]):
+                    i += 1
+                    continue
+
+                """
+                drawPred(yoloImgL,
+                         str(i) + ": " + objectName,
+                         0,
+                         objectCentre[0] - 5, objectCentre[1] - 5,
+                         objectCentre[0] + 5, objectCentre[1] + 5,
+                         SEACHINGFOR[objectName])
+                """
 
                 centrePoint = disparityPointTo3D(objectCentre[0],
-                                                 objectCentre[1])
-
+                                                 objectCentre[1],
+                                                 scaledUpDisparity)
                 objectDistance = centrePoint[2]
 
+                #objectDi yoloImgL[][]
+
+                # If nearest object, update nearestObjectDistance
                 if (nearestObjectDistance is None
                     or objectDistance < nearestObjectDistance):
                     nearestObjectDistance = objectDistance
 
+                # Draw the correpsonding rect on the Yolo image
                 drawPred(yoloImgL,
-                         objectName,
+                         str(i) + ": " + objectName,
                          objectDistance,
                          left, top, left + width, top + height,
                          SEACHINGFOR[objectName])
+
+                i += 1
 
         # Region End
 
@@ -442,7 +472,7 @@ for imageNameL in imageNameListL:
         if (cropDisparity):
             # Crop left part of disparity image where not seen by both cameras
             # Crop out the car bonnet
-            yoloImgL = yoloImgL[0:390, 135:yoloWidth]
+            pass#yoloImgL = yoloImgL[0:390, 135:yoloWidth]
 
         # Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
         t, _ = net.getPerfProfile()
