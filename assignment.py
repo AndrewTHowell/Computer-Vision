@@ -6,6 +6,18 @@
 # License : LGPL - http://www.gnu.org/licenses/lgpl.html
 #####################################################################
 
+# To start the program:
+# Change master_path_to_dataset to the path to where the dataset is saved
+# on your Computer
+
+# If you wish to start at a certain timestamp, enter it in startTimestamp
+
+# User inputs during playback:
+# exit - x
+# save yolo and disparity map - s
+# crop - c
+# pause the 'video' - space
+
 # Section: Import modules
 
 import cv2
@@ -17,9 +29,13 @@ import math
 
 # Section End
 
-# Section: Set path to the video dataset
+# Section: User variables
 
 master_path_to_dataset = "D:/howel/Videos/Computer Vision Coursework"
+
+# set this to a file timestamp to start from (empty is first example - outside lab)
+# e.g. set to 1506943191.487683 for the end of the Bailey, just as the vehicle turns
+startTimestamp = ""  # set to timestamp to skip forward to
 
 # Section End
 
@@ -224,10 +240,6 @@ net.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL)
 cropDisparity = True  # display full or cropped disparity image
 pausePlayback = True  # pause until key press after each image
 
-# set this to a file timestamp to start from (empty is first example - outside lab)
-# e.g. set to 1506943191.487683 for the end of the Bailey, just as the vehicle turns
-startTimestamp = ""  # set to timestamp to skip forward to
-
 # Region End
 
 # Section: 2D disparity to 3D depth
@@ -412,10 +424,7 @@ for imageNameL in imageNameListL:
         # Keep track of closest object in each frame
         nearestObjectDistance = None
 
-        print("scaledUpDisparity.shape: {0}".format(scaledUpDisparity.shape))
-
         # draw resulting detections on image
-        i = 0
         for detected_object in range(0, len(boxes)):
             objectName = classes[classIDs[detected_object]]
             # If object is a person or vehicle
@@ -433,7 +442,6 @@ for imageNameL in imageNameListL:
 
                 if (objectCentre[1] > scaledUpDisparity.shape[0]
                     or objectCentre[0] > scaledUpDisparity.shape[1]):
-                    i += 1
                     continue
 
                 """
@@ -472,7 +480,7 @@ for imageNameL in imageNameListL:
         if (cropDisparity):
             # Crop left part of disparity image where not seen by both cameras
             # Crop out the car bonnet
-            pass#yoloImgL = yoloImgL[0:390, 135:yoloWidth]
+            yoloImgL = yoloImgL[0:390, 135:yoloWidth]
 
         # Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
         t, _ = net.getPerfProfile()
@@ -518,9 +526,9 @@ for imageNameL in imageNameListL:
             break  # exit
 
         elif (key == ord('s')):     # save
-            cv2.imwrite("sgbm-disparty.png", disparityScaled)
-            cv2.imwrite("left.png", imgL)
-            cv2.imwrite("right.png", imgR)
+            currentPath = os.path.dirname(os.path.abspath(__file__))
+            cv2.imwrite(currentPath + "//disparityMap.png", scaledUpDisparity)
+            cv2.imwrite(currentPath + "//yolo.png", yoloImgL)
 
         elif (key == ord('c')):     # crop
             cropDisparity = not(cropDisparity)
