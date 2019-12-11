@@ -28,11 +28,18 @@ master_path_to_dataset = "D:/howel/Videos/Computer Vision Coursework"
 # Disparity Mapping
 MAXDISPARITY = 128
 BLOCKSIZE = 21
-P1
-P2
-DISP12MAXDIFFPREFILTERCAP,
-UNIQUENESSRATIO, SPECKLEWINDOWSIZE,
-SPECKLERANGE, MODE
+P1 = 0
+P2 = 0
+DISP12MAXDIFF = 0
+PREFILTERCAP = 0
+UNIQUENESSRATIO = 0  # 5-15
+SPECKLEWINDOWSIZE = 0  # 50-200
+SPECKLERANGE = 0  # 1 or 2
+MODE = 0  # MODE_SGBM = 0, MODE_HH = 1, MODE_SGBM_3WAY = 2, MODE_HH4 = 3
+
+# Yolo
+CONFIDENCETHRESHOLD = 0.5  # Confidence threshold
+NMSTHRESHOLD = 0.4   # Non-maximum suppression threshold
 
 # Section End
 
@@ -44,12 +51,6 @@ SEACHINGFOR = {"person": (114, 20, 34),
                "motorbike": (52, 59, 41),
                "bus": (255, 35, 1),
                "truck": (248, 243, 53)}
-
-# YOLO CNN object detection model
-CONFIDENCETHRESHOLD = 0.5  # Confidence threshold
-NMSTHRESHOLD = 0.4   # Non-maximum suppression threshold
-INPWIDTH = 416       # WIDTH OF NETWORK'S INPUT IMAGE
-INPHEIGHT = 416      # Height of network's input image
 
 camera_focal_length_px = 399.9745178222656  # focal length in pixels
 camera_focal_length_m = 4.8 / 1000          # focal length in metres (4.8 mm)
