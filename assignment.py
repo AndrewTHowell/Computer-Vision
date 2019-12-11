@@ -222,7 +222,7 @@ net.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL)
 # Region: User input variables
 
 cropDisparity = True  # display full or cropped disparity image
-pausePlayback = True  # pause until key press after each image
+pausePlayback = False  # pause until key press after each image
 
 # set this to a file timestamp to start from (empty is first example - outside lab)
 # e.g. set to 1506943191.487683 for the end of the Bailey, just as the vehicle turns
@@ -445,7 +445,6 @@ for imageNameL in imageNameListL:
             # Crop left part of disparity image where not seen by both cameras
             # Crop out the car bonnet
             yoloImgL = yoloImgL[0:390, 135:yoloWidth]
-            print("yoloImgL.shape: {0}".format(yoloImgL.shape))
 
         # Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
         t, _ = net.getPerfProfile()
@@ -470,8 +469,11 @@ for imageNameL in imageNameListL:
 
 
         # Output filenames and nearest detected scene object
-        print("{0}.png\n{1}.png : nearest detected scene object ({2:.1f}m)"
-              .format(imageNameL, imageNameR, nearestObjectDistance))
+        if nearestObjectDistance is not None:
+            print("{0}.png\n{1}.png : nearest detected scene object ({2:.1f}m)"
+                  .format(imageNameL, imageNameR, nearestObjectDistance))
+        else:
+            print("{0}.png\n{1}.png".format(imageNameL, imageNameR))
 
         # exit - x
         # save - s
