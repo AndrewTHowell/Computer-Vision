@@ -45,6 +45,11 @@ NMSTHRESHOLD = 0.4   # Non-maximum suppression threshold
 CLIPLIMIT = 2.0
 TILEGRIDSIZE = (8, 8)
 
+# Speckle FIltering
+MAXSPECKLESIZE = 4000
+DISPNOISEFILTER = 5  # increase for more agressive filtering
+MAXDIFF = MAXDISPARITY - DISPNOISEFILTER
+
 # Section End
 
 # Section: Constants
@@ -314,7 +319,7 @@ for imageNameL in imageNameListL:
             image = CLAHE.apply(image)
 
             windowSize = (9, 9)
-            image = cv2.GaussianBlur(image, windowSize, windowsSize[0]/6)
+            image = cv2.GaussianBlur(image, windowSize, windowSize[0]/6)
 
             windowSize = 9
             image = cv2.medianBlur(image, windowSize)
@@ -330,14 +335,13 @@ for imageNameL in imageNameListL:
         # Region: POSTPROCESSING
 
         # Filter out noise and speckles (adjust parameters as needed)
-        dispNoiseFilter = 5  # increase for more agressive filtering
-        cv2.filterSpeckles(disparity, 0, 4000, MAXDISPARITY - dispNoiseFilter)
+        cv2.filterSpeckles(disparity, 0, MAXSPECKLESIZE, MAXDIFF)
 
         windowSize = (5, 5)
-        disparity = cv2.GaussianBlur(disparity, windowSize, windowsSize[0]/6)
+        disparity = cv2.GaussianBlur(disparity, windowSize, windowSize[0]/6)
 
         windowSize = (9, 9)
-        disparity = cv2.GaussianBlur(disparity, windowSize, windowsSize[0]/6)
+        disparity = cv2.GaussianBlur(disparity, windowSize, windowSize[0]/6)
 
         windowSize = 5
         disparity = cv2.medianBlur(disparity, windowSize)
@@ -361,7 +365,6 @@ for imageNameL in imageNameListL:
         # display image (scaling it to the full 0->255 range based on the number
         # of disparities in use for the stereo part)
         scaledUpDisparity = (disparityScaled * (256. / MAXDISPARITY)).astype(np.uint8)
-        cv2.imshow("Disparity", scaledUpDisparity)
 
         # Now 3D
         points3D = project_disparity_to_3d(disparityScaled, MAXDISPARITY)
@@ -376,7 +379,7 @@ for imageNameL in imageNameListL:
         windowName = "YOLO"
         cv2.namedWindow(windowName, cv2.WINDOW_NORMAL)
 
-        yoloImgL = imgL
+        yoloImgL = imgL.copy()
 
         yoloWidth = yoloImgL.shape[1]
         yoloHeight = yoloImgL.shape[0]
@@ -453,10 +456,11 @@ for imageNameL in imageNameListL:
                     0.5, (0, 0, 255))
 
         # display images
-        cv2.imshow('Right image', imgR)
-        cv2.imshow('Left image', imgL)
+        #cv2.imshow('Right image', imgR)
+        #cv2.imshow('Left image', imgL)
         cv2.imshow(windowName, yoloImgL)
         cv2.resizeWindow(windowName, yoloImgL.shape[1], yoloImgL.shape[0])
+        cv2.imshow("Disparity", scaledUpDisparity)
 
         # stop the timer and convert to ms. (to see how long processing and display takes)
         stop_t = ((cv2.getTickCount() - start_t)/cv2.getTickFrequency()) * 1000
