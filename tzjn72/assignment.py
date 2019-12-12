@@ -38,7 +38,7 @@ master_path_to_dataset = "D:/howel/Videos/Computer Vision Coursework"
 
 # set this to a file timestamp to start from
 # e.g. set to 1506943191.487683 for the end of the Bailey
-startTimestamp = "1506942637.476314"  # set to timestamp to skip forward to
+startTimestamp = ""  # set to timestamp to skip forward to
 
 cropDisparity = True  # display full or cropped disparity image
 
