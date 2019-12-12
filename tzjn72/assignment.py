@@ -38,11 +38,11 @@ master_path_to_dataset = "D:/howel/Videos/Computer Vision Coursework"
 
 # set this to a file timestamp to start from
 # e.g. set to 1506943191.487683 for the end of the Bailey
-startTimestamp = ""  # set to timestamp to skip forward to
+startTimestamp = "1506942637.476314"  # set to timestamp to skip forward to
 
 cropDisparity = True  # display full or cropped disparity image
 
-pausePlayback = False  # pause until key press after each image
+pausePlayback = True  # pause until key press after each image
 
 # Section End
 
@@ -52,13 +52,13 @@ pausePlayback = False  # pause until key press after each image
 
 # Disparity Mapping
 MAXDISPARITY = 128
-BLOCKSIZE = 7  # must be odd
+BLOCKSIZE = 9  # must be odd
 P1 = 600
 P2 = 4000
 DISP12MAXDIFF = 20
 PREFILTERCAP = 16
 UNIQUENESSRATIO = 3  # 5-15
-SPECKLEWINDOWSIZE = 125  # 50-200
+SPECKLEWINDOWSIZE = 150  # 50-200
 SPECKLERANGE = 5  # 1 or 2
 MODE = 1  # MODE_SGBM = 0, MODE_HH = 1, MODE_SGBM_3WAY = 2, MODE_HH4 = 3
 PERCENTILE = 25
@@ -366,7 +366,7 @@ for imageNameL in imageNameListL:
             image = CLAHE.apply(image)
 
             # Gaussian Blur
-            windowSize = (9, 9)
+            windowSize = (7, 7)
             image = cv2.GaussianBlur(image, windowSize, windowSize[0]/6)
 
             # Median Blur
@@ -388,7 +388,7 @@ for imageNameL in imageNameListL:
 
         # Gaussian Blur
         windowSize = (5, 5)
-        disparity = cv2.GaussianBlur(disparity, windowSize, windowSize[0]/6)
+        disparity = cv2.GaussianBlur(disparity, windowSize, windowSize[0]/9)
 
         # Median Blur - removes salt and pepper noise
         windowSize = 5
@@ -464,7 +464,7 @@ for imageNameL in imageNameListL:
         # Convert back to rgb
         labImg = cv2.cvtColor(yoloImgL, cv2.COLOR_BGR2LAB)
         labPlanes = cv2.split(labImg)
-        clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(6,6))
+        clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(6, 6))
         labPlanes[0] = clahe.apply(labPlanes[0])
         labImg = cv2.merge(labPlanes)
         yoloImgL = cv2.cvtColor(labImg, cv2.COLOR_LAB2BGR)
@@ -501,10 +501,12 @@ for imageNameL in imageNameListL:
                     left -= 135
 
                 if top < 0:
+                    height += top
                     top = 0
                 if top + height > scaledUpDisparity.shape[0]:
                     height = scaledUpDisparity.shape[0] - top
                 if left < 0:
+                    width += left
                     left = 0
                 if left + width > scaledUpDisparity.shape[1]:
                     width = scaledUpDisparity.shape[1] - left
@@ -557,6 +559,7 @@ for imageNameL in imageNameListL:
         # Region End
 
         # display yolo image
+
         cv2.imshow(windowName, yoloImgOutput)
         cv2.resizeWindow(windowName,
                          yoloImgOutput.shape[1], yoloImgOutput.shape[0])
